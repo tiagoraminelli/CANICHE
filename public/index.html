@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guardia de Castraciones</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h2>Registrar Ingreso</h2>
+        <form id="form-registro">
+            <input type="text" id="nombre" placeholder="Nombre del dueño" required>
+            <input type="text" id="apellido" placeholder="Apellido" required>
+            <input type="text" id="telefono" placeholder="Teléfono" required>
+            <input type="text" id="animal" placeholder="Nombre del animal" required>
+            
+            <select id="especie" required>
+                <option value="perro">Perro</option>
+                <option value="gato">Gato</option>
+                <option value="otro">Otro</option>
+            </select>
+            
+            <select id="sexo" required>
+                <option value="hembra">Hembra</option>
+                <option value="macho">Macho</option>
+            </select>
+            
+            <button type="submit">Agendar Turno</button>
+        </form>
+
+        <h2>Turnos Agendados</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Dueño</th>
+                    <th>Animal</th>
+                    <th>Fecha y Hora</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-turnos">
+                <!-- Los datos se cargan con JS -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Conectamos el archivo JS -->
+    <script src="app.js"></script>
+</body>
+</html>

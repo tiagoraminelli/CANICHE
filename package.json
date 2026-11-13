@@ -1,0 +1,9 @@
+{
+  "name": "castraciones",
+  "version": "1.0.0",
+  "description": "Sistema de turnos para guardia",
+  "type": "module",
+  "dependencies": {
+    "@libsql/client": "^0.5.6"
+  }
+}
