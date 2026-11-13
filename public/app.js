@@ -116,6 +116,8 @@ document.getElementById('form-ingreso').addEventListener('submit', async (e) => 
     }
 });
 
+// --- LÓGICA DE LA TABLA Y EDICIÓN ---
+
 async function loadTurnos() {
     try {
         const res = await fetch(API_URL);
@@ -126,17 +128,74 @@ async function loadTurnos() {
             tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-neutral-400">No hay turnos.</td></tr>';
             return;
         }
-        tbody.innerHTML = data.turnos.map(t => `
+        tbody.innerHTML = data.turnos.map(t => {
+            // Separar fecha y hora para el modal
+            const [fecha, horaCompleta] = t.fecha_hora.split(' ');
+            const hora = horaCompleta ? horaCompleta.substring(0, 5) : '';
+
+            return `
             <tr class="hover:bg-neutral-50">
                 <td class="px-4 py-3 text-neutral-900 whitespace-nowrap">${t.fecha_hora}</td>
                 <td class="px-4 py-3 text-neutral-600">${t.animal}</td>
                 <td class="px-4 py-3 text-neutral-600">${t.dueno} <br><span class="text-xs text-neutral-400">${t.telefono || ''}</span></td>
                 <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs font-medium ${t.estado === 'asistio' ? 'bg-green-100 text-green-700' : 'bg-neutral-100 text-neutral-600'}">${t.estado.toUpperCase()}</span></td>
-                <td class="px-4 py-3 text-right">${t.estado === 'pendiente' ? `<button onclick="marcarAsistio('${t.id}')" class="text-xs font-medium underline hover:text-black">Asistió</button>` : ''}</td>
+                <td class="px-4 py-3 text-right">
+                    <button onclick="abrirModalEditar('${t.id}', '${fecha}', '${hora}', '${t.estado}')" class="text-xs font-medium text-blue-600 hover:text-blue-800 underline">Editar</button>
+                </td>
             </tr>
-        `).join('');
+        `}).join('');
     } catch (e) { console.error(e); }
 }
+
+// Funciones del Modal
+window.abrirModalEditar = function(id, fecha, hora, estado) {
+    document.getElementById('edit-id').value = id;
+    document.getElementById('edit-fecha').value = fecha;
+    document.getElementById('edit-hora').value = hora;
+    document.getElementById('edit-estado').value = estado;
+    
+    const modal = document.getElementById('modal-editar');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+window.cerrarModal = function() {
+    const modal = document.getElementById('modal-editar');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+document.getElementById('form-editar').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.textContent = "Guardando...";
+    btn.disabled = true;
+
+    const payload = {
+        turnoId: document.getElementById('edit-id').value,
+        fecha: document.getElementById('edit-fecha').value,
+        hora: document.getElementById('edit-hora').value,
+        estado: document.getElementById('edit-estado').value
+    };
+
+    try {
+        const res = await fetch(API_URL, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error("Error al actualizar");
+        
+        cerrarModal();
+        loadTurnos(); // Recargar la tabla
+    } catch (error) {
+        alert("Error: " + error.message);
+    } finally {
+        btn.textContent = "Guardar Cambios";
+        btn.disabled = false;
+    }
+});
 
 async function loadDirectorio() {
     try {
@@ -155,16 +214,4 @@ async function loadDirectorio() {
             </tr>
         `).join('');
     } catch (e) { console.error(e); }
-}
-
-window.marcarAsistio = async function(turnoId) {
-    if(!confirm("¿Marcar como asistido? El animal pasará a estado castrado.")) return;
-    try {
-        await fetch(API_URL, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ turnoId })
-        });
-        loadTurnos();
-    } catch (error) { alert('Error actualizando turno'); }
 }

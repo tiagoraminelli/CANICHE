@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guardia - Castraciones</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    
-    <!-- Tailwind vía CDN (Para que se vea bien en local sin compilar) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -17,14 +15,12 @@
             }
         }
     </script>
-    
     <style>
         body { background-color: #fafafa; }
     </style>
 </head>
 <body class="text-neutral-900 h-screen flex flex-col md:flex-row overflow-hidden font-sans">
 
-    <!-- SIDEBAR -->
     <aside class="w-full md:w-56 bg-white border-b md:border-b-0 md:border-r border-neutral-200 flex flex-col shrink-0">
         <div class="h-14 flex items-center px-5">
             <span class="font-semibold text-sm tracking-wide">GUARDIA VET</span>
@@ -36,7 +32,6 @@
         </nav>
     </aside>
 
-    <!-- CONTENIDO PRINCIPAL -->
     <main class="flex-1 flex flex-col h-full overflow-hidden bg-white">
         <header class="h-14 border-b border-neutral-200 flex items-center px-6 shrink-0 justify-between">
             <h1 id="page-title" class="text-sm font-medium text-neutral-600">Recepción</h1>
@@ -93,7 +88,7 @@
                 <div class="border border-neutral-200 rounded-lg overflow-hidden">
                     <table class="w-full text-left text-sm">
                         <thead class="bg-neutral-50 border-b border-neutral-200 text-xs uppercase text-neutral-500 font-medium">
-                            <tr><th class="px-4 py-3">Fecha / Hora</th><th class="px-4 py-3">Animal</th><th class="px-4 py-3">Responsable</th><th class="px-4 py-3">Estado</th><th class="px-4 py-3 text-right">Acción</th></tr>
+                            <tr><th class="px-4 py-3">Fecha / Hora</th><th class="px-4 py-3">Animal</th><th class="px-4 py-3">Responsable</th><th class="px-4 py-3">Estado</th><th class="px-4 py-3 text-right">Acciones</th></tr>
                         </thead>
                         <tbody id="tabla-turnos" class="divide-y divide-neutral-100 bg-white"></tbody>
                     </table>
@@ -120,7 +115,39 @@
         </div>
     </main>
 
-    <!-- Conectamos el JS -->
+    <!-- MODAL DE EDICIÓN -->
+    <div id="modal-editar" class="fixed inset-0 bg-neutral-900/50 backdrop-blur-sm hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center">
+                <h3 class="font-semibold text-neutral-900">Editar Turno</h3>
+                <button onclick="cerrarModal()" class="text-neutral-400 hover:text-neutral-600">&times;</button>
+            </div>
+            <form id="form-editar" class="p-6 space-y-4">
+                <input type="hidden" id="edit-id">
+                <div>
+                    <label class="block text-xs font-medium text-neutral-600 mb-1">Fecha</label>
+                    <input type="date" id="edit-fecha" required class="w-full px-3 py-2 text-sm border border-neutral-300 rounded focus:outline-none focus:border-neutral-900">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-neutral-600 mb-1">Hora</label>
+                    <input type="time" id="edit-hora" required class="w-full px-3 py-2 text-sm border border-neutral-300 rounded focus:outline-none focus:border-neutral-900">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-neutral-600 mb-1">Estado</label>
+                    <select id="edit-estado" class="w-full px-3 py-2 text-sm border border-neutral-300 rounded focus:outline-none focus:border-neutral-900">
+                        <option value="pendiente">Pendiente</option>
+                        <option value="asistio">Asistió (Castrado)</option>
+                        <option value="cancelado">Cancelado</option>
+                    </select>
+                </div>
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button type="button" onclick="cerrarModal()" class="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded font-medium">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-neutral-900 hover:bg-black text-white rounded text-sm font-medium">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="/app.js" type="module"></script>
 </body>
 </html>

@@ -1,7 +1,6 @@
 import { createClient } from "@libsql/client/web";
 
 export default async function handler(req, res) {
-  // Configuración de CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -16,6 +15,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Falta configurar TURSO_TOKEN en Vercel" });
   }
 
+  // Ojo: Acá corregí el "n" de tiagoraminelli
   const db = createClient({
     url: "libsql://castraciones-tiagoraminelli.aws-sa-east-1.turso.io",
     authToken: process.env.TURSO_TOKEN,
@@ -76,13 +76,26 @@ export default async function handler(req, res) {
       return res.status(201).json({ mensaje: "Ingreso registrado" });
     }
 
+    // --- NUEVO: PUT para Editar Turno ---
     if (req.method === 'PUT') {
-      const { turnoId } = req.body;
-      await db.batch([
-        { sql: "UPDATE turnos SET estado = 'asistio' WHERE id = ?", args: [turnoId] },
-        { sql: "UPDATE animales SET castrado = 1 WHERE id = (SELECT animal_id FROM turnos WHERE id = ?)", args: [turnoId] }
-      ], "write");
-      return res.status(200).json({ mensaje: "Asistencia confirmada" });
+      const { turnoId, fecha, hora, estado } = req.body;
+      
+      if (estado === 'asistio') {
+        // Si cambia a asistió, actualizamos el turno y el animal
+        await db.batch([
+          { sql: "UPDATE turnos SET estado = ? WHERE id = ?", args: [estado, turnoId] },
+          { sql: "UPDATE animales SET castrado = 1 WHERE id = (SELECT animal_id FROM turnos WHERE id = ?)", args: [turnoId] }
+        ], "write");
+      } else if (fecha && hora) {
+        // Si solo edita fecha y hora
+        const fechaHora = `${fecha} ${hora}:00`;
+        await db.execute({
+          sql: "UPDATE turnos SET fecha_hora = ? WHERE id = ?",
+          args: [fechaHora, turnoId]
+        });
+      }
+
+      return res.status(200).json({ mensaje: "Turno actualizado" });
     }
 
     return res.status(405).json({ error: "Método no permitido" });
