@@ -2,7 +2,7 @@ import { createClient } from "@libsql/client";
 
 // Vercel va a inyectar esta variable de entorno de forma segura
 const db = createClient({
-  url: "libsql://castraciones-tiagarominelli.aws-sa-east-1.turso.io",
+  url: "libsql://castraciones-tiagoraminelli.aws-sa-east-1.turso.io",
   authToken: process.env.TURSO_TOKEN, 
 });
 
