@@ -7,6 +7,35 @@ let paginaActual = 1;
 let timeoutBusqueda;
 let personasCacheadas = [];
 
+// ==========================================
+// HELPER PARA WHATSAPP
+// ==========================================
+function generarEnlaceWhatsApp(telefono, nombre) {
+    if (!telefono) return null;
+    
+    // Limpiamos el número de espacios, guiones, paréntesis y el "+"
+    let numeroLimpio = telefono.toString().replace(/[\s\-\(\)\+]/g, '');
+    
+    // Normalización Argentina: Si empieza con 0 (ej. 0340...), se lo quitamos
+    if (numeroLimpio.startsWith('0')) {
+        numeroLimpio = numeroLimpio.substring(1);
+    }
+    
+    // Si no tiene el prefijo de Argentina (54), se lo agregamos
+    if (!numeroLimpio.startsWith('54')) {
+        numeroLimpio = '54' + numeroLimpio;
+    }
+    
+    // Mensaje predefinido
+    const mensaje = `Hola ${nombre}, ¿cómo estás? Te contactamos desde Guardia Vet para comunicarnos con vos. ¡Saludos!`;
+    
+    // Codificamos el mensaje
+    const mensajeCodificado = encodeURIComponent(mensaje);
+    
+    return `https://wa.me/${numeroLimpio}?text=${mensajeCodificado}`;
+}
+
+
 document.addEventListener("DOMContentLoaded", () => {
     const hoy = new Date();
     document.getElementById('i-fecha').valueAsDate = hoy;
@@ -50,7 +79,7 @@ window.abrirModalIngreso = () => {
     const form = document.getElementById('form-ingreso');
     form.reset();
     document.getElementById('i-fecha').valueAsDate = new Date();
-    limpiarPersonaSeleccionada(); // Resetea el buscador
+    limpiarPersonaSeleccionada(); 
     document.getElementById('modal-ingreso').classList.replace('hidden', 'flex');
 };
 
@@ -89,6 +118,9 @@ async function loadTurnos() {
             if (t.estado === 'asistio') badgeClass = 'bg-green-100 text-green-700';
             if (t.estado === 'cancelado' || t.estado === 'ausente') badgeClass = 'bg-red-100 text-red-700';
 
+            // Integramos WhatsApp acá también
+            const waLink = generarEnlaceWhatsApp(t.telefono, t.dueno.split(' ')[0]); // Solo el primer nombre
+
             return `
             <tr class="hover:bg-neutral-50">
                 <td class="px-4 py-3 text-neutral-900 whitespace-nowrap">${t.fecha_hora}</td>
@@ -98,6 +130,7 @@ async function loadTurnos() {
                 <td class="px-4 py-3 text-right space-x-2">
                     <button onclick='verDetalles(${JSON.stringify(t)})' class="text-xs font-medium text-neutral-600 hover:text-black underline">Ver</button>
                     <button onclick='abrirEditar(${JSON.stringify(t)})' class="text-xs font-medium text-blue-600 hover:text-blue-800 underline">Editar</button>
+                    ${waLink ? `<a href="${waLink}" target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-green-600 hover:text-green-800 underline">WhatsApp</a>` : ''}
                     <button onclick="eliminarTurno('${t.id}')" class="text-xs font-medium text-red-600 hover:text-red-800 underline">Eliminar</button>
                 </td>
             </tr>
@@ -246,7 +279,7 @@ window.limpiarPersonaSeleccionada = (borrarTexto = true) => {
     seccion.querySelectorAll('input').forEach(i => i.required = true);
 };
 
-// --- DIRECTORIO CON BÚSQUEDA ---
+// --- DIRECTORIO CON BÚSQUEDA Y WHATSAPP ---
 let timeoutDirectorio;
 
 document.getElementById('filtro-directorio').addEventListener('input', (e) => {
@@ -260,7 +293,7 @@ async function loadDirectorio(busqueda = "") {
     const tbodyPersonas = document.getElementById('tabla-personas');
     const tbodyAnimales = document.getElementById('tabla-animales');
     
-    tbodyPersonas.innerHTML = '<tr><td colspan="2" class="px-4 py-4 text-center text-neutral-400">Buscando...</td></tr>';
+    tbodyPersonas.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-neutral-400">Buscando...</td></tr>';
     tbodyAnimales.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-neutral-400">Buscando...</td></tr>';
 
     try {
@@ -268,14 +301,26 @@ async function loadDirectorio(busqueda = "") {
         const data = await res.json();
         
         if (data.personas.length === 0) {
-            tbodyPersonas.innerHTML = '<tr><td colspan="2" class="px-4 py-4 text-center text-neutral-400">No se encontraron personas.</td></tr>';
+            tbodyPersonas.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-neutral-400">No se encontraron personas.</td></tr>';
         } else {
-            tbodyPersonas.innerHTML = data.personas.map(p => `
+            tbodyPersonas.innerHTML = data.personas.map(p => {
+                // Generamos el link de WhatsApp
+                const waLink = generarEnlaceWhatsApp(p.telefono, p.nombre);
+                
+                return `
                 <tr class="hover:bg-neutral-50">
                     <td class="px-4 py-3 text-neutral-900">${p.apellido}, ${p.nombre}</td>
                     <td class="px-4 py-3 text-neutral-500">${p.telefono || '-'}</td>
+                    <td class="px-4 py-3 text-right">
+                        ${waLink ? `
+                            <a href="${waLink}" target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-green-600 hover:text-green-800 underline" title="Enviar WhatsApp">
+                                WhatsApp
+                            </a>
+                        ` : '<span class="text-xs text-neutral-300">Sin tel.</span>'}
+                    </td>
                 </tr>
-            `).join('');
+                `;
+            }).join('');
         }
         
         if (data.animales.length === 0) {
@@ -291,7 +336,7 @@ async function loadDirectorio(busqueda = "") {
         }
     } catch (e) { 
         console.error("Error cargando directorio", e); 
-        tbodyPersonas.innerHTML = '<tr><td colspan="2" class="px-4 py-4 text-center text-red-500">Error de conexión</td></tr>';
+        tbodyPersonas.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-red-500">Error de conexión</td></tr>';
         tbodyAnimales.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-red-500">Error de conexión</td></tr>';
     }
 }
