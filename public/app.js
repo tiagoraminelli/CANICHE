@@ -1,15 +1,16 @@
 const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-const API_URL = isLocal ? "https://castraciones-tiagoraminelli.aws-sa-east-1.vercel.app/api/turnos" : "/api/turnos";
+const API_URL = isLocal 
+    ? "https://castraciones-tiagoraminelli.aws-sa-east-1.vercel.app/api/turnos" 
+    : "/api/turnos";
 
 let paginaActual = 1;
 let timeoutBusqueda;
+let personasCacheadas = [];
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Inicializar fechas
     const hoy = new Date();
     document.getElementById('i-fecha').valueAsDate = hoy;
-    document.getElementById('filtro-mes').value = hoy.toISOString().slice(0, 7); // "YYYY-MM"
-    
+    document.getElementById('filtro-mes').value = hoy.toISOString().slice(0, 7);
     initApp();
 });
 
@@ -21,39 +22,48 @@ async function initApp() {
         document.getElementById('status-db').classList.replace('text-neutral-400', 'text-green-600');
     } catch {
         document.getElementById('status-db').textContent = "Error";
+        document.getElementById('status-db').classList.replace('text-neutral-400', 'text-red-600');
     }
 }
 
-// --- NAVEGACIÓN ---
+// --- NAVEGACIÓN TABS ---
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
+        const tabId = e.target.dataset.tab;
         document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-        document.getElementById(`tab-${e.target.dataset.tab}`).classList.remove('hidden');
+        document.getElementById(`tab-${tabId}`).classList.remove('hidden');
         
-        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('bg-neutral-100', 'text-neutral-900'));
+        document.querySelectorAll('.tab-btn').forEach(el => {
+            el.classList.remove('bg-neutral-100', 'text-neutral-900');
+            el.classList.add('text-neutral-500', 'hover:bg-neutral-50');
+        });
+        e.target.classList.remove('text-neutral-500', 'hover:bg-neutral-50');
         e.target.classList.add('bg-neutral-100', 'text-neutral-900');
 
-        if (e.target.dataset.tab === 'directorio') loadDirectorio();
+        if (tabId === 'directorio') loadDirectorio();
+        if (tabId === 'listado') loadTurnos();
     });
 });
 
 // --- MODALES ---
-window.abrirModalIngreso = () => { document.getElementById('modal-ingreso').classList.replace('hidden', 'flex'); };
+window.abrirModalIngreso = () => {
+    const form = document.getElementById('form-ingreso');
+    form.reset();
+    document.getElementById('i-fecha').valueAsDate = new Date();
+    limpiarPersonaSeleccionada(); // Resetea el buscador
+    document.getElementById('modal-ingreso').classList.replace('hidden', 'flex');
+};
+
 window.cerrarModal = (id) => { document.getElementById(id).classList.replace('flex', 'hidden'); };
 
-// --- FILTROS Y PAGINACIÓN ---
+// --- FILTROS Y PAGINACIÓN (TURNOS) ---
 document.getElementById('filtro-mes').addEventListener('change', () => { paginaActual = 1; loadTurnos(); });
 document.getElementById('filtro-busqueda').addEventListener('input', () => {
     clearTimeout(timeoutBusqueda);
     timeoutBusqueda = setTimeout(() => { paginaActual = 1; loadTurnos(); }, 400);
 });
+window.cambiarPagina = (delta) => { paginaActual += delta; loadTurnos(); };
 
-window.cambiarPagina = (delta) => {
-    paginaActual += delta;
-    loadTurnos();
-};
-
-// --- CARGA DE TURNOS ---
 async function loadTurnos() {
     const tbody = document.getElementById('tabla-turnos');
     tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-neutral-400">Cargando...</td></tr>';
@@ -65,8 +75,7 @@ async function loadTurnos() {
         const res = await fetch(`${API_URL}?pagina=${paginaActual}&mes=${mes}&busqueda=${encodeURIComponent(busqueda)}`);
         const data = await res.json();
         
-        // Actualizar paginación
-        document.getElementById('info-paginacion').textContent = `Mostrando página ${data.currentPage} de ${data.totalPages || 1} (${data.total} turnos)`;
+        document.getElementById('info-paginacion').textContent = `Página ${data.currentPage} de ${data.totalPages || 1} (${data.total} turnos)`;
         document.getElementById('btn-prev').disabled = data.currentPage <= 1;
         document.getElementById('btn-next').disabled = data.currentPage >= data.totalPages;
 
@@ -98,7 +107,7 @@ async function loadTurnos() {
     }
 }
 
-// --- ACCIONES ---
+// --- ACCIONES (VER, EDITAR, ELIMINAR) ---
 window.verDetalles = (turno) => {
     document.getElementById('contenido-ver').innerHTML = `
         <div class="grid grid-cols-2 gap-4">
@@ -128,7 +137,7 @@ window.abrirEditar = (t) => {
 };
 
 window.eliminarTurno = async (id) => {
-    if (!confirm("¿Eliminar este turno? El animal y la persona quedarán en el directorio.")) return;
+    if (!confirm("¿Eliminar este turno?")) return;
     try {
         const res = await fetch(API_URL, {
             method: "DELETE",
@@ -139,7 +148,6 @@ window.eliminarTurno = async (id) => {
     } catch (e) { alert("Error al eliminar"); }
 };
 
-// --- FORMULARIOS ---
 document.getElementById('form-editar').addEventListener('submit', async (e) => {
     e.preventDefault();
     const payload = {
@@ -153,13 +161,15 @@ document.getElementById('form-editar').addEventListener('submit', async (e) => {
     if (res.ok) { cerrarModal('modal-editar'); loadTurnos(); }
 });
 
+// --- CREAR TURNO (FORMULARIO) ---
 document.getElementById('form-ingreso').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('btn-submit');
     btn.textContent = "Guardando...";
+    btn.disabled = true;
     
     const payload = {
-        personaExistenteId: document.getElementById('buscador-persona').value,
+        personaExistenteId: document.getElementById('buscador-persona-id').value || null,
         nombre: document.getElementById('i-nombre').value,
         apellido: document.getElementById('i-apellido').value,
         telefono: document.getElementById('i-telefono').value,
@@ -172,48 +182,116 @@ document.getElementById('form-ingreso').addEventListener('submit', async (e) => 
         observaciones: document.getElementById('i-observaciones').value
     };
 
-    const res = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    if (res.ok) {
-        cerrarModal('modal-ingreso');
-        e.target.reset();
-        document.getElementById('i-fecha').valueAsDate = new Date();
-        cargarPersonasEnBuscador();
-        loadTurnos();
+    try {
+        const res = await fetch(API_URL, { 
+            method: "POST", 
+            headers: { "Content-Type": "application/json" }, 
+            body: JSON.stringify(payload) 
+        });
+
+        if (res.ok) {
+            cerrarModal('modal-ingreso');
+            loadTurnos();
+        } else {
+            alert("Error del servidor");
+        }
+    } catch (error) {
+        alert("Error de red: " + error.message);
+    } finally {
+        btn.textContent = "Confirmar e Ingresar";
+        btn.disabled = false;
     }
-    btn.textContent = "Confirmar e Ingresar";
 });
 
-// --- HELPERS ---
+// --- BUSCADOR DE PERSONAS EN EL MODAL ---
 async function cargarPersonasEnBuscador() {
-    const res = await fetch(`${API_URL}?tipo=directorio`); // Mantenemos esta llamada o podemos hacer un GET específico
-    // Nota: Como cambiamos el backend para paginar, esta llamada dará error si no la adaptamos.
-    // Para safar ahora: simulamos que traemos todas las personas de la página 1 (Si hay muchas, habría que crear un endpoint GET /api/personas).
-    // Como estamos usando el backend unificado, vamos a pedir turnos y extraer las personas únicas (parche rápido).
-    // Lo ideal a futuro es un endpoint /api/personas
     try {
-        // Simulamos traer personas desde el directorio
-        // HACK TEMPORAL PARA QUE FUNCIONE EL FORMULARIO
-        const select = document.getElementById('buscador-persona');
-        // Como no tenemos endpoint de personas, dejamos el select solo con la opción de nueva persona por ahora.
-        select.innerHTML = '<option value="">-- Registrar nueva persona --</option>';
-    } catch(e) {}
+        const res = await fetch(`${API_URL}?tipo=personas_todas`);
+        const data = await res.json();
+        personasCacheadas = data.personas || [];
+        
+        const datalist = document.getElementById('lista-personas');
+        datalist.innerHTML = personasCacheadas.map(p => 
+            `<option value="${p.apellido}, ${p.nombre} (${p.telefono || 'Sin tel'})" data-id="${p.id}"></option>`
+        ).join('');
+    } catch (e) { console.error("Error cargando personas", e); }
 }
 
-document.getElementById('buscador-persona').addEventListener('change', (e) => {
-    const seccion = document.getElementById('seccion-persona');
-    const inputs = seccion.querySelectorAll('input');
-    if (e.target.value) {
+document.getElementById('buscador-persona-texto').addEventListener('input', (e) => {
+    const valor = e.target.value;
+    const personaEncontrada = personasCacheadas.find(p => 
+        `${p.apellido}, ${p.nombre} (${p.telefono || 'Sin tel'})` === valor
+    );
+
+    if (personaEncontrada) {
+        document.getElementById('buscador-persona-id').value = personaEncontrada.id;
+        document.getElementById('persona-seleccionada').classList.remove('hidden');
+        document.getElementById('texto-persona-seleccionada').textContent = `Seleccionado: ${personaEncontrada.apellido}, ${personaEncontrada.nombre}`;
+        
+        const seccion = document.getElementById('seccion-persona');
         seccion.classList.add('opacity-50', 'pointer-events-none');
-        inputs.forEach(i => i.required = false);
+        seccion.querySelectorAll('input').forEach(i => i.required = false);
     } else {
-        seccion.classList.remove('opacity-50', 'pointer-events-none');
-        inputs.forEach(i => i.required = true);
+        limpiarPersonaSeleccionada(false);
     }
 });
 
-// --- DIRECTORIO ---
-async function loadDirectorio() {
-    // (Mismo código de antes)
-    document.getElementById('tabla-personas').innerHTML = '<tr><td colspan="2" class="text-center py-4 text-neutral-400">No disponible en esta versión.</td></tr>';
-    document.getElementById('tabla-animales').innerHTML = '<tr><td colspan="3" class="text-center py-4 text-neutral-400">No disponible en esta versión.</td></tr>';
+window.limpiarPersonaSeleccionada = (borrarTexto = true) => {
+    document.getElementById('buscador-persona-id').value = "";
+    document.getElementById('persona-seleccionada').classList.add('hidden');
+    if (borrarTexto) document.getElementById('buscador-persona-texto').value = "";
+    
+    const seccion = document.getElementById('seccion-persona');
+    seccion.classList.remove('opacity-50', 'pointer-events-none');
+    seccion.querySelectorAll('input').forEach(i => i.required = true);
+};
+
+// --- DIRECTORIO CON BÚSQUEDA ---
+let timeoutDirectorio;
+
+document.getElementById('filtro-directorio').addEventListener('input', (e) => {
+    clearTimeout(timeoutDirectorio);
+    timeoutDirectorio = setTimeout(() => {
+        loadDirectorio(e.target.value);
+    }, 400);
+});
+
+async function loadDirectorio(busqueda = "") {
+    const tbodyPersonas = document.getElementById('tabla-personas');
+    const tbodyAnimales = document.getElementById('tabla-animales');
+    
+    tbodyPersonas.innerHTML = '<tr><td colspan="2" class="px-4 py-4 text-center text-neutral-400">Buscando...</td></tr>';
+    tbodyAnimales.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-neutral-400">Buscando...</td></tr>';
+
+    try {
+        const res = await fetch(`${API_URL}?tipo=directorio&busqueda=${encodeURIComponent(busqueda)}`);
+        const data = await res.json();
+        
+        if (data.personas.length === 0) {
+            tbodyPersonas.innerHTML = '<tr><td colspan="2" class="px-4 py-4 text-center text-neutral-400">No se encontraron personas.</td></tr>';
+        } else {
+            tbodyPersonas.innerHTML = data.personas.map(p => `
+                <tr class="hover:bg-neutral-50">
+                    <td class="px-4 py-3 text-neutral-900">${p.apellido}, ${p.nombre}</td>
+                    <td class="px-4 py-3 text-neutral-500">${p.telefono || '-'}</td>
+                </tr>
+            `).join('');
+        }
+        
+        if (data.animales.length === 0) {
+            tbodyAnimales.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-neutral-400">No se encontraron animales.</td></tr>';
+        } else {
+            tbodyAnimales.innerHTML = data.animales.map(a => `
+                <tr class="hover:bg-neutral-50">
+                    <td class="px-4 py-3 text-neutral-900">${a.nombre || 'S/N'} <span class="text-xs text-neutral-400">(${a.especie})</span></td>
+                    <td class="px-4 py-3 text-neutral-500">${a.dueno}</td>
+                    <td class="px-4 py-3"><span class="text-xs ${a.castrado ? 'text-green-600' : 'text-amber-600'}">${a.castrado ? 'Castrado' : 'Pendiente'}</span></td>
+                </tr>
+            `).join('');
+        }
+    } catch (e) { 
+        console.error("Error cargando directorio", e); 
+        tbodyPersonas.innerHTML = '<tr><td colspan="2" class="px-4 py-4 text-center text-red-500">Error de conexión</td></tr>';
+        tbodyAnimales.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-red-500">Error de conexión</td></tr>';
+    }
 }

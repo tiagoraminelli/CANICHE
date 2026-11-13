@@ -17,10 +17,49 @@ export default async function handler(req, res) {
   });
 
   try {
-    // --- GET: Listado Paginado y Filtrado ---
+    // --- GET: Listados y Busquedas ---
     if (req.method === 'GET') {
-      const { pagina = 1, busqueda = '', mes = '' } = req.query;
-      const limit = 10; // Turnos por página
+      const { tipo, pagina = 1, busqueda = '', mes = '' } = req.query;
+
+      // 1. ENDPOINT PARA EL DIRECTORIO (Personas y Animales)
+      if (tipo === 'directorio') {
+        const limit = 20;
+        const offset = (parseInt(pagina) - 1) * limit;
+
+        let sqlP = "SELECT * FROM personas";
+        let argsP = [];
+        if (busqueda) {
+            sqlP += " WHERE (nombre LIKE ? OR apellido LIKE ?)";
+            argsP = [`%${busqueda}%`, `%${busqueda}%`];
+        }
+        sqlP += " ORDER BY apellido ASC LIMIT ? OFFSET ?";
+        argsP.push(limit, offset);
+        const personas = await db.execute({ sql: sqlP, args: argsP });
+
+        let sqlA = `
+          SELECT a.*, p.nombre || ' ' || p.apellido AS dueno 
+          FROM animales a JOIN personas p ON p.id = a.persona_id
+        `;
+        let argsA = [];
+        if (busqueda) {
+            sqlA += " WHERE (a.nombre LIKE ? OR p.nombre LIKE ? OR p.apellido LIKE ?)";
+            argsA = [`%${busqueda}%`, `%${busqueda}%`, `%${busqueda}%`];
+        }
+        sqlA += " ORDER BY a.creado_en DESC LIMIT ? OFFSET ?";
+        argsA.push(limit, offset);
+        const animales = await db.execute({ sql: sqlA, args: argsA });
+
+        return res.status(200).json({ personas: personas.rows, animales: animales.rows });
+      }
+
+      // 2. ENDPOINT PARA LISTAR TODAS LAS PERSONAS (Para el buscador del modal)
+      if (tipo === 'personas_todas') {
+        const personas = await db.execute("SELECT * FROM personas ORDER BY apellido ASC");
+        return res.status(200).json({ personas: personas.rows });
+      }
+
+      // 3. ENDPOINT PAGINADO DE TURNOS
+      const limit = 10;
       const offset = (parseInt(pagina) - 1) * limit;
 
       let baseSql = `
@@ -31,13 +70,11 @@ export default async function handler(req, res) {
       let args = [];
       let conditions = [];
 
-      // Filtro por mes (ej: "2026-11")
       if (mes) {
         conditions.push("strftime('%Y-%m', t.fecha_hora) = ?");
         args.push(mes);
       }
 
-      // Filtro de búsqueda (nombre dueño o animal)
       if (busqueda) {
         conditions.push("(p.nombre LIKE ? OR p.apellido LIKE ? OR a.nombre LIKE ?)");
         const like = `%${busqueda}%`;
@@ -46,13 +83,11 @@ export default async function handler(req, res) {
 
       const whereClause = conditions.length > 0 ? " WHERE " + conditions.join(" AND ") : "";
 
-      // 1. Contar total para la paginación
       const countSql = `SELECT COUNT(*) as total ${baseSql} ${whereClause}`;
       const countResult = await db.execute({ sql: countSql, args });
       const total = countResult.rows[0].total;
       const totalPages = Math.ceil(total / limit);
 
-      // 2. Traer los datos de esta página
       const dataSql = `
         SELECT t.id, t.fecha_hora, t.estado, t.observaciones, a.nombre AS animal, a.especie, a.sexo, p.nombre || ' ' || p.apellido AS dueno, p.telefono, p.direccion
         ${baseSql} ${whereClause}
@@ -112,7 +147,6 @@ export default async function handler(req, res) {
     // --- DELETE: Eliminar Turno ---
     if (req.method === 'DELETE') {
       const { turnoId } = req.body;
-      // Solo eliminamos el turno (el animal y persona quedan en el directorio)
       await db.execute({ sql: "DELETE FROM turnos WHERE id = ?", args: [turnoId] });
       return res.status(200).json({ mensaje: "Turno eliminado" });
     }
