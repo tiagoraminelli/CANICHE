@@ -3,49 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Guardia de Castraciones</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Guardia - Castraciones</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind vía CDN (Para que se vea bien en local sin compilar) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body { background-color: #fafafa; }
+    </style>
 </head>
-<body>
-    <div class="container">
-        <h2>Registrar Ingreso</h2>
-        <form id="form-registro">
-            <input type="text" id="nombre" placeholder="Nombre del dueño" required>
-            <input type="text" id="apellido" placeholder="Apellido" required>
-            <input type="text" id="telefono" placeholder="Teléfono" required>
-            <input type="text" id="animal" placeholder="Nombre del animal" required>
-            
-            <select id="especie" required>
-                <option value="perro">Perro</option>
-                <option value="gato">Gato</option>
-                <option value="otro">Otro</option>
-            </select>
-            
-            <select id="sexo" required>
-                <option value="hembra">Hembra</option>
-                <option value="macho">Macho</option>
-            </select>
-            
-            <button type="submit">Agendar Turno</button>
-        </form>
+<body class="text-neutral-900 h-screen flex flex-col md:flex-row overflow-hidden font-sans">
 
-        <h2>Turnos Agendados</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Dueño</th>
-                    <th>Animal</th>
-                    <th>Fecha y Hora</th>
-                    <th>Estado</th>
-                </tr>
-            </thead>
-            <tbody id="tabla-turnos">
-                <!-- Los datos se cargan con JS -->
-            </tbody>
-        </table>
-    </div>
+    <!-- SIDEBAR -->
+    <aside class="w-full md:w-56 bg-white border-b md:border-b-0 md:border-r border-neutral-200 flex flex-col shrink-0">
+        <div class="h-14 flex items-center px-5">
+            <span class="font-semibold text-sm tracking-wide">GUARDIA VET</span>
+        </div>
+        <nav class="flex-1 p-3 space-y-1">
+            <button class="tab-btn w-full text-left px-3 py-2 text-sm font-medium bg-neutral-100 text-neutral-900 rounded-md transition-colors" data-tab="ingreso">Nuevo Ingreso</button>
+            <button class="tab-btn w-full text-left px-3 py-2 text-sm font-medium text-neutral-500 hover:bg-neutral-50 rounded-md transition-colors" data-tab="listado">Listado de Turnos</button>
+            <button class="tab-btn w-full text-left px-3 py-2 text-sm font-medium text-neutral-500 hover:bg-neutral-50 rounded-md transition-colors" data-tab="directorio">Directorio</button>
+        </nav>
+    </aside>
 
-    <!-- Conectamos el archivo JS -->
-    <script src="app.js"></script>
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="flex-1 flex flex-col h-full overflow-hidden bg-white">
+        <header class="h-14 border-b border-neutral-200 flex items-center px-6 shrink-0 justify-between">
+            <h1 id="page-title" class="text-sm font-medium text-neutral-600">Recepción</h1>
+            <div id="status-db" class="text-xs text-neutral-400">Conectando...</div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-6 md:p-10">
+            
+            <!-- INGRESO -->
+            <div id="tab-ingreso" class="tab-content block max-w-3xl mx-auto">
+                <form id="form-ingreso" class="space-y-8">
+                    <div class="bg-neutral-50 p-4 border border-neutral-200 rounded-lg">
+                        <label class="block text-xs font-medium text-neutral-600 mb-2">¿La persona ya está registrada?</label>
+                        <select id="buscador-persona" class="w-full px-3 py-2 text-sm border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 bg-white">
+                            <option value="">-- Registrar nueva persona --</option>
+                        </select>
+                    </div>
+
+                    <div id="seccion-persona" class="space-y-4 transition-opacity duration-200">
+                        <h3 class="text-xs font-semibold text-neutral-400 uppercase tracking-wider border-b pb-2">Datos del Responsable</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label class="block text-xs font-medium text-neutral-600 mb-1">Nombre</label><input type="text" id="i-nombre" required class="w-full px-3 py-2 text-sm border border-neutral-300 rounded focus:outline-none focus:border-neutral-900"></div>
+                            <div><label class="block text-xs font-medium text-neutral-600 mb-1">Apellido</label><input type="text" id="i-apellido" required class="w-full px-3 py-2 text-sm border border-neutral-300 rounded focus:outline-none focus:border-neutral-900"></div>
+                            <div><label class="block text-xs font-medium text-neutral-600 mb-1">Teléfono</label><input type="text" id="i-telefono" required class="w-full px-3 py-2 text-sm border border-neutral-300 rounded focus:outline-none focus:border-neutral-900"></div>
+                            <div><label class="block text-xs font-medium text-neutral-600 mb-1">Dirección</label><input type="text" id="i-direccion" class="w-full px-3 py-2 text-sm border border-neutral-300 rounded focus:outline-none focus:border-neutral-900"></div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <h3 class="text-xs font-semibold text-neutral-400 uppercase tracking-wider border-b pb-2">Datos del Animal</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div><label class="block text-xs font-medium text-neutral-600 mb-1">Nombre</label><input type="text" id="i-animal-nombre" class="w-full px-3 py-2 text-sm border border-neutral-300 rounded focus:outline-none focus:border-neutral-900"></div>
+                            <div><label class="block text-xs font-medium text-neutral-600 mb-1">Especie</label><select id="i-especie" class="w-full px-3 py-2 text-sm border border-neutral-300 rounded focus:outline-none focus:border-neutral-900"><option value="perro">Perro</option><option value="gato">Gato</option><option value="otro">Otro</option></select></div>
+                            <div><label class="block text-xs font-medium text-neutral-600 mb-1">Sexo</label><select id="i-sexo" class="w-full px-3 py-2 text-sm border border-neutral-300 rounded focus:outline-none focus:border-neutral-900"><option value="hembra">Hembra</option><option value="macho">Macho</option></select></div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <h3 class="text-xs font-semibold text-neutral-400 uppercase tracking-wider border-b pb-2">Turno</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label class="block text-xs font-medium text-neutral-600 mb-1">Fecha</label><input type="date" id="i-fecha" required class="w-full px-3 py-2 text-sm border border-neutral-300 rounded focus:outline-none focus:border-neutral-900"></div>
+                            <div><label class="block text-xs font-medium text-neutral-600 mb-1">Hora</label><input type="time" id="i-hora" required class="w-full px-3 py-2 text-sm border border-neutral-300 rounded focus:outline-none focus:border-neutral-900"></div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4">
+                        <button type="submit" id="btn-submit" class="bg-neutral-900 hover:bg-black text-white px-6 py-2.5 rounded text-sm font-medium transition-colors w-full">Confirmar e Ingresar</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- LISTADO -->
+            <div id="tab-listado" class="tab-content hidden max-w-5xl mx-auto">
+                <div class="border border-neutral-200 rounded-lg overflow-hidden">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-neutral-50 border-b border-neutral-200 text-xs uppercase text-neutral-500 font-medium">
+                            <tr><th class="px-4 py-3">Fecha / Hora</th><th class="px-4 py-3">Animal</th><th class="px-4 py-3">Responsable</th><th class="px-4 py-3">Estado</th><th class="px-4 py-3 text-right">Acción</th></tr>
+                        </thead>
+                        <tbody id="tabla-turnos" class="divide-y divide-neutral-100 bg-white"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- DIRECTORIO -->
+            <div id="tab-directorio" class="tab-content hidden max-w-5xl mx-auto">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h3 class="text-sm font-medium mb-3">Personas</h3>
+                        <div class="border border-neutral-200 rounded-lg overflow-hidden">
+                            <table class="w-full text-left text-sm"><thead class="bg-neutral-50 border-b text-xs text-neutral-500"><tr><th class="px-4 py-2 font-medium">Nombre</th><th class="px-4 py-2 font-medium">Teléfono</th></tr></thead><tbody id="tabla-personas" class="divide-y divide-neutral-100 bg-white"></tbody></table>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-medium mb-3">Animales</h3>
+                        <div class="border border-neutral-200 rounded-lg overflow-hidden">
+                            <table class="w-full text-left text-sm"><thead class="bg-neutral-50 border-b text-xs text-neutral-500"><tr><th class="px-4 py-2 font-medium">Animal</th><th class="px-4 py-2 font-medium">Dueño</th><th class="px-4 py-2 font-medium">Estado</th></tr></thead><tbody id="tabla-animales" class="divide-y divide-neutral-100 bg-white"></tbody></table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Conectamos el JS -->
+    <script src="/app.js" type="module"></script>
 </body>
 </html>

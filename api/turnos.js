@@ -1,13 +1,7 @@
-import { createClient } from "@libsql/client";
-
-// Vercel va a inyectar esta variable de entorno de forma segura
-const db = createClient({
-  url: "libsql://castraciones-tiagoraminelli.aws-sa-east-1.turso.io",
-  authToken: process.env.TURSO_TOKEN, 
-});
+import { createClient } from "@libsql/client/web";
 
 export default async function handler(req, res) {
-  // Manejo de CORS para que tu frontend pueda consultar la API
+  // Configuración de CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -18,46 +12,80 @@ export default async function handler(req, res) {
     return;
   }
 
+  if (!process.env.TURSO_TOKEN) {
+    return res.status(500).json({ error: "Falta configurar TURSO_TOKEN en Vercel" });
+  }
+
+  const db = createClient({
+    url: "libsql://castraciones-tiagarominelli.aws-sa-east-1.turso.io",
+    authToken: process.env.TURSO_TOKEN,
+  });
+
   try {
-    // GET: Obtener todos los turnos
     if (req.method === 'GET') {
+      const { tipo } = req.query;
+      
+      if (tipo === 'directorio') {
+        const personas = await db.execute("SELECT * FROM personas ORDER BY apellido ASC");
+        const animales = await db.execute(`
+          SELECT a.*, p.nombre || ' ' || p.apellido AS dueno 
+          FROM animales a JOIN personas p ON p.id = a.persona_id 
+          ORDER BY a.creado_en DESC
+        `);
+        return res.status(200).json({ personas: personas.rows, animales: animales.rows });
+      } 
+      
       const result = await db.execute(`
-        SELECT t.id, p.nombre || ' ' || p.apellido AS dueno, 
-               a.nombre AS animal, a.especie, t.fecha_hora, t.estado
+        SELECT t.id, t.fecha_hora, t.estado, a.nombre AS animal, p.nombre || ' ' || p.apellido AS dueno, p.telefono
         FROM turnos t
         JOIN animales a ON a.id = t.animal_id
         JOIN personas p ON p.id = a.persona_id
-        ORDER BY t.fecha_hora ASC
+        ORDER BY t.fecha_hora DESC
       `);
       return res.status(200).json({ turnos: result.rows });
     }
 
-    // POST: Crear un nuevo turno
     if (req.method === 'POST') {
-      const { nombre, apellido, telefono, animal, especie, sexo } = req.body;
+      const { nombre, apellido, telefono, direccion, animal, especie, sexo, fecha, hora, personaExistenteId } = req.body;
       
-      const personaId = crypto.randomUUID();
-      const animalId = crypto.randomUUID();
-      const turnoId = crypto.randomUUID();
-      
-      // Fecha de mañana a las 10:00
-      const manana = new Date();
-      manana.setDate(manana.getDate() + 1);
-      manana.setHours(10, 0, 0, 0);
-      const fechaHora = manana.toISOString().replace('T', ' ').substring(0, 19);
+      let personaId = personaExistenteId;
+      let animalId = crypto.randomUUID();
+      let turnoId = crypto.randomUUID();
+      const fechaHora = `${fecha} ${hora}:00`;
 
-      // Ejecutamos las 3 inserciones en bloque
+      const queries = [];
+
+      if (!personaId) {
+        personaId = crypto.randomUUID();
+        queries.push({ 
+          sql: "INSERT INTO personas (id, nombre, apellido, telefono, direccion) VALUES (?, ?, ?, ?, ?)", 
+          args: [personaId, nombre, apellido, telefono, direccion] 
+        });
+      }
+
+      queries.push({ 
+        sql: "INSERT INTO animales (id, persona_id, nombre, especie, sexo) VALUES (?, ?, ?, ?, ?)", 
+        args: [animalId, personaId, animal, especie, sexo] 
+      });
+      queries.push({ 
+        sql: "INSERT INTO turnos (id, animal_id, fecha_hora, estado) VALUES (?, ?, ?, 'pendiente')", 
+        args: [turnoId, animalId, fechaHora] 
+      });
+
+      await db.batch(queries, "write");
+      return res.status(201).json({ mensaje: "Ingreso registrado" });
+    }
+
+    if (req.method === 'PUT') {
+      const { turnoId } = req.body;
       await db.batch([
-        { sql: "INSERT INTO personas (id, nombre, apellido, telefono) VALUES (?, ?, ?, ?)", args: [personaId, nombre, apellido, telefono] },
-        { sql: "INSERT INTO animales (id, persona_id, nombre, especie, sexo) VALUES (?, ?, ?, ?, ?)", args: [animalId, personaId, animal, especie, sexo] },
-        { sql: "INSERT INTO turnos (id, animal_id, fecha_hora) VALUES (?, ?, ?)", args: [turnoId, animalId, fechaHora] }
+        { sql: "UPDATE turnos SET estado = 'asistio' WHERE id = ?", args: [turnoId] },
+        { sql: "UPDATE animales SET castrado = 1 WHERE id = (SELECT animal_id FROM turnos WHERE id = ?)", args: [turnoId] }
       ], "write");
-
-      return res.status(201).json({ mensaje: "Turno creado con éxito" });
+      return res.status(200).json({ mensaje: "Asistencia confirmada" });
     }
 
     return res.status(405).json({ error: "Método no permitido" });
-
   } catch (error) {
     console.error("Error en la BD:", error);
     return res.status(500).json({ error: "Error interno del servidor" });
