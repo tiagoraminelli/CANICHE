@@ -6,7 +6,7 @@
     "build": "tailwindcss -i ./public/src/input.css -o ./public/style.css --minify"
   },
   "dependencies": {
-    "@libsql/client": "^0.5.6"
+    "@libsql/client": "0.5.6"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.1"
