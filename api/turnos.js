@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   }
 
   const db = createClient({
-    url: "libsql://castraciones-tiagarominelli.aws-sa-east-1.turso.io",
+    url: "libsql://castraciones-tiagoraminelli.aws-sa-east-1.turso.io",
     authToken: process.env.TURSO_TOKEN,
   });
 
